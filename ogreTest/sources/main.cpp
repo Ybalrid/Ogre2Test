@@ -3,7 +3,8 @@
 #include <memory>
 
 #include<Ogre.h>
-
+#include <Compositor\OgreCompositorManager2.h>
+#include <Compositor\OgreCompositorWorkspace.h>
 //Change the number of threads Ogre should use here
 constexpr const size_t SMGR_WORKERS{ 4 };
 
@@ -31,11 +32,29 @@ int main(void)
 	//Create a scene manager that use X threads
 	auto smgr = root->createSceneManager(Ogre::ST_GENERIC, SMGR_WORKERS, Ogre::INSTANCING_CULLING_THREADED);
 
-	auto camera = smgr->createCamera("MyCamera");
-	auto cameraNode = smgr->getRootSceneNode()->createChildSceneNode();
-	cameraNode->attachObject(camera);
+	auto renderSystem = root->getRenderSystem();
 
-	pause();
+	//Create and attach a camera to the scene manager
+	auto camera = smgr->createCamera("MyCamera");
+	//auto cameraNode = smgr->getRootSceneNode()->createChildSceneNode();
+	//cameraNode->attachObject(camera);
+
+	camera->setPosition({ 0, 0, 10 });
+
+	auto compositorManager = root->getCompositorManager2();
+
+	const Ogre::IdString workspaceName{ "MyWorkspace" };
+
+	if (!compositorManager->hasWorkspaceDefinition(workspaceName))
+		compositorManager->createBasicWorkspaceDef(workspaceName, Ogre::ColourValue::Green);
+
+	auto workspace = compositorManager->addWorkspace(smgr, window, camera, workspaceName, true);
+
+	while (!window->isClosed())
+	{
+		Ogre::WindowEventUtilities::messagePump();
+		root->renderOneFrame();
+	}
 
 	return EXIT_SUCCESS;
 }
