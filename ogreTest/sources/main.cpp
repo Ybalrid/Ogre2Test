@@ -24,7 +24,12 @@ constexpr const char* const RG_MYRG{ "MY_RESOURCE_GROUP" };
 
 //Define the shading language for the HighLevelMaterialSystem.
 //I only want to use the OpenGL render system, so I'm just going to hardcode it as GLSL
+//Theses text variable should be set as so and don't change
 constexpr const char* const SL{ "GLSL" };
+constexpr const char* const GL3PLUS_RENDERSYSTEM{ "OpenGL 3+ Rendering Subsystem" };
+
+//Level of anti-aliasing
+Ogre::uint8 AALevel{ 16 };
 
 using namespace std;
 
@@ -100,13 +105,27 @@ int main(void)
 	Ogre::LogManager::getSingleton().setLogDetail(Ogre::LoggingLevel::LL_BOREME);
 
 	//Configure root
-	root->showConfigDialog();
+	//root->showConfigDialog();
 
-	//Create an automatic window
-	auto window = root->initialise(true);
+	auto renderSystem = root->getRenderSystemByName(GL3PLUS_RENDERSYSTEM);
 
-	auto renderSystemName = Ogre::Root::getSingleton().getRenderSystem()->getName();
-	cerr << renderSystemName << '\n';
+#ifdef _DEBUG
+	if (!renderSystem) throw std::runtime_error("Ogre is unable to find the GL3+ RenderSystem");
+#endif
+
+	root->setRenderSystem(renderSystem);
+	renderSystem->setConfigOption("FSAA", to_string(AALevel));
+	renderSystem->setConfigOption("sRGB Gamma Conversion", "Yes");
+
+	//Create a window
+	root->initialise(false);
+
+	Ogre::NameValuePairList misc;
+	misc["vsync"] = "false";
+	misc["FSAA"] = to_string(AALevel);
+	misc["top"] = to_string(0);
+	misc["left"] = to_string(0);
+	auto window = root->createRenderWindow("Ogre Window", 1024, 768, false, &misc);
 
 	//Create a scene manager that use X threads
 	auto smgr = root->createSceneManager(Ogre::ST_GENERIC, SMGR_WORKERS, Ogre::INSTANCING_CULLING_THREADED);
