@@ -1,8 +1,6 @@
 #include <iostream>
 #include <string>
 #include <memory>
-#include <atomic>
-#include <thread>
 
 #include <Ogre.h>
 #include <OgreMesh2.h>
@@ -36,20 +34,64 @@ void pause()
 	cin.get();
 }
 
-atomic<bool> run = true;
-void quitOnPose(void)
-{
-	cin.get();
-	run = false;
-}
-
 Ogre::Quaternion animation(float sec)
 {
 	return Ogre::Quaternion{ Ogre::Radian(Ogre::Math::PI + (Ogre::Math::PI * Ogre::Math::Cos(sec))), Ogre::Vector3::UNIT_Y };
 }
 
+decltype(auto) loadV1mesh(Ogre::String meshName)
+{
+	return Ogre::v1::MeshManager::getSingleton().load(meshName, Ogre::ResourceGroupManager::AUTODETECT_RESOURCE_GROUP_NAME, Ogre::v1::HardwareBuffer::HBU_STATIC, Ogre::v1::HardwareBuffer::HBU_STATIC);
+}
+
+decltype(auto) asV2mesh(Ogre::String meshName, Ogre::String ResourceGroup = Ogre::ResourceGroupManager::DEFAULT_RESOURCE_GROUP_NAME, Ogre::String sufix = " V2",
+						bool halfPos = true, bool halfTextCoords = true, bool qTangents = true)
+{
+	//Get the V1 mesh
+	auto v1mesh = loadV1mesh(meshName);
+
+	//Convert it as a V2 mesh
+	auto mesh = Ogre::MeshManager::getSingletonPtr()->createManual(meshName + sufix, ResourceGroup);
+	mesh->importV1(v1mesh.get(), halfPos, halfTextCoords, qTangents);
+
+	//Unload the useless V1 mesh
+	v1mesh->unload();
+	v1mesh.setNull();
+
+	//Return the shared pointer to the new mesh
+	return mesh;
+}
+
+void declareHlmsLibrary(const Ogre::String&& path)
+{
+#ifdef _DEBUG
+	if (string(SL) != "GLSL" || string(Ogre::Root::getSingleton().getRenderSystem()->getName()) != "OpenGL 3+ Rendering Subsystem")
+		throw std::runtime_error("This function is OpenGL only. Please use the RenderSytem_GL3+ in the Ogre configuration!");
+#endif
+	Ogre::String hlmsFolder = path;
+
+	//The hlmsFolder can come from a configuration file where it could be "empty" or set to "." or lacking the trailing "/"
+	if (hlmsFolder.empty()) hlmsFolder = "./";
+	else if (hlmsFolder[hlmsFolder.size() - 1] != '/') hlmsFolder += "/";
+
+	auto hlmsManager = Ogre::Root::getSingleton().getHlmsManager();
+	//Define the shader library to use for HLMS
+	auto library = Ogre::ArchiveVec();
+	auto archiveLibrary = Ogre::ArchiveManager::getSingletonPtr()->load(hlmsFolder + "Hlms/Common/" + SL, "FileSystem", true);
+	library.push_back(archiveLibrary);
+
+	//Define "unlit" and "PBS" (physics based shader) HLMS
+	auto archiveUnlit = Ogre::ArchiveManager::getSingletonPtr()->load(hlmsFolder + "Hlms/Unlit/" + SL, "FileSystem", true);
+	auto archivePbs = Ogre::ArchiveManager::getSingletonPtr()->load(hlmsFolder + "Hlms/Pbs/" + SL, "FileSystem", true);
+	auto hlmsUnlit = OGRE_NEW Ogre::HlmsUnlit(archiveUnlit, &library);
+	auto hlmsPbs = OGRE_NEW Ogre::HlmsPbs(archivePbs, &library);
+	hlmsManager->registerHlms(hlmsUnlit);
+	hlmsManager->registerHlms(hlmsPbs);
+}
+
 int main(void)
 {
+	auto run{ true };
 	cout << "Hello world!\n";
 	//auto quitThread = thread(quitOnPose);quitThread.detach();
 
@@ -63,6 +105,9 @@ int main(void)
 	//Create an automatic window
 	auto window = root->initialise(true);
 
+	auto renderSystemName = Ogre::Root::getSingleton().getRenderSystem()->getName();
+	cerr << renderSystemName << '\n';
+
 	//Create a scene manager that use X threads
 	auto smgr = root->createSceneManager(Ogre::ST_GENERIC, SMGR_WORKERS, Ogre::INSTANCING_CULLING_THREADED);
 	smgr->setDisplaySceneNodes(true);
@@ -72,25 +117,7 @@ int main(void)
 	resourceGroupManager->addResourceLocation("./media/", "FileSystem", RG_MYRG);
 
 	//Init the HLMS
-
-	//Get the manager
-	auto hlmsManager = root->getHlmsManager();
-
-	//Set where to find the HLMS shader library
-	Ogre::String hlmsFolder = "./HLMS/";
-
-	//Define the shader library to use for HLMS
-	Ogre::ArchiveVec library;
-	auto archiveLibrary = Ogre::ArchiveManager::getSingletonPtr()->load(hlmsFolder + "Hlms/Common/" + SL, "FileSystem", true);
-	library.push_back(archiveLibrary);
-
-	//Define "unlit" and "PBS" (physics based shader) HLMS
-	auto archiveUnlit = Ogre::ArchiveManager::getSingletonPtr()->load(hlmsFolder + "Hlms/Unlit/" + SL, "FileSystem", true);
-	auto archivePbs = Ogre::ArchiveManager::getSingletonPtr()->load(hlmsFolder + "Hlms/Pbs/" + SL, "FileSystem", true);
-	auto hlmsUnlit = OGRE_NEW Ogre::HlmsUnlit(archiveUnlit, &library);
-	hlmsManager->registerHlms(hlmsUnlit);
-	auto hlmsPbs = OGRE_NEW Ogre::HlmsPbs(archivePbs, &library);
-	hlmsManager->registerHlms(hlmsPbs);
+	declareHlmsLibrary("HLMS");
 
 	//All resources initialized
 	resourceGroupManager->initialiseAllResourceGroups();
@@ -109,19 +136,8 @@ int main(void)
 	//Give it the current scene, the camera from where to render, and use the window as output
 	auto workspace = compositorManager->addWorkspace(smgr, window, camera, workspaceName, true);
 
-	//Load an Ogre 1.x mesh
-	auto v1mesh = Ogre::v1::MeshManager::getSingleton().load("athene.mesh", Ogre::ResourceGroupManager::AUTODETECT_RESOURCE_GROUP_NAME, Ogre::v1::HardwareBuffer::HBU_STATIC, Ogre::v1::HardwareBuffer::HBU_STATIC);
-
-	//Create a Ogre 2.x mesh and convert the old one to the new format
-	Ogre::MeshPtr v2mesh = Ogre::MeshManager::getSingleton().createManual("athene.mesh V2", RG_MYRG);
-	v2mesh->importV1(v1mesh.get(), true, true, true);
-
-	//Get rid of the old mesh
-	v1mesh->unload();
-	v1mesh.setNull();
-
 	//Create an Item (not an Entity) from the new mesh
-	auto a3dObject = smgr->createItem(v2mesh);
+	auto a3dObject = smgr->createItem(asV2mesh("athene.mesh", RG_MYRG));
 	auto objectNode = smgr->getRootSceneNode()->createChildSceneNode();
 	objectNode->attachObject(a3dObject);
 	objectNode->setScale(0.1, 0.1, 0.1);
@@ -139,14 +155,11 @@ int main(void)
 	light->setType(Ogre::Light::LT_DIRECTIONAL);
 	light->setDirection(Ogre::Vector3(0, -1, -0.75f).normalisedCopy());
 	light->setPowerScale(Ogre::Math::PI);
-	/*light->setDiffuseColour(Ogre::ColourValue::Red);
-	light->setSpecularColour(Ogre::ColourValue::Red);*/
 
 	root->getTimer()->reset();
 	do
 	{
 		objectNode->setOrientation(animation(static_cast<float>(root->getTimer()->getMilliseconds()) / 1000.0f));
-		//cout << "frame\n";
 		Ogre::WindowEventUtilities::messagePump();
 		if (window->isClosed()) break;
 		root->renderOneFrame();
