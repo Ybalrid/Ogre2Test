@@ -16,6 +16,8 @@
 #include <Compositor/OgreCompositorManager2.h>
 #include <Compositor/OgreCompositorWorkspace.h>
 
+#include <Windows.h>
+
 //Change the number of threads Ogre should use here
 constexpr const size_t SMGR_WORKERS{ 4 };
 
@@ -94,6 +96,13 @@ void declareHlmsLibrary(const Ogre::String&& path)
 	hlmsManager->registerHlms(hlmsPbs);
 }
 
+int main(void);
+
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
+{
+	return main();
+}
+
 int main(void)
 {
 	auto run{ true };
@@ -104,12 +113,11 @@ int main(void)
 	auto root = make_unique<Ogre::Root>("plugins.cfg", "ogre.cfg", "Ogre.log");
 	Ogre::LogManager::getSingleton().setLogDetail(Ogre::LoggingLevel::LL_BOREME);
 
-	//Configure root
-	//root->showConfigDialog();
-
+	//Get the OpenGL 3+ RenderSystem
 	auto renderSystem = root->getRenderSystemByName(GL3PLUS_RENDERSYSTEM);
 
 #ifdef _DEBUG
+	//renderSystem should not be nullptr now
 	if (!renderSystem) throw std::runtime_error("Ogre is unable to find the GL3+ RenderSystem");
 #endif
 
@@ -117,14 +125,17 @@ int main(void)
 	renderSystem->setConfigOption("FSAA", to_string(AALevel));
 	renderSystem->setConfigOption("sRGB Gamma Conversion", "Yes");
 
-	//Create a window
+	//Init Ogre without automatically creating the render window
 	root->initialise(false);
 
-	Ogre::NameValuePairList misc;
+	//Put the miscellaneous configuration option the window can take in a value pair list
+	auto misc = Ogre::NameValuePairList();
 	misc["vsync"] = "false";
 	misc["FSAA"] = to_string(AALevel);
 	misc["top"] = to_string(0);
 	misc["left"] = to_string(0);
+
+	//Manually create a window
 	auto window = root->createRenderWindow("Ogre Window", 1024, 768, false, &misc);
 
 	//Create a scene manager that use X threads
@@ -134,6 +145,7 @@ int main(void)
 	//Declare some resources
 	auto resourceGroupManager = Ogre::ResourceGroupManager::getSingletonPtr();
 	resourceGroupManager->addResourceLocation("./media/", "FileSystem", RG_MYRG);
+	resourceGroupManager->addResourceLocation("./media/Sinbad", "FileSystem", RG_MYRG);
 
 	//Init the HLMS
 	declareHlmsLibrary("HLMS");
@@ -143,6 +155,13 @@ int main(void)
 
 	//Create and attach a camera to the scene manager
 	auto camera = smgr->createCamera("MyCamera");
+	camera->setNearClipDistance(0.01f);
+	camera->setFarClipDistance(2000);
+	camera->setAutoAspectRatio(true);
+
+	if (auto cameraNode = camera->getParentSceneNode()) cameraNode->detachObject(camera);
+	auto cameraNode = smgr->getRootSceneNode()->createChildSceneNode();
+	cameraNode->attachObject(camera);
 
 	//Configure the compositor for simple rendering
 	auto compositorManager = root->getCompositorManager2();
@@ -159,26 +178,60 @@ int main(void)
 	auto a3dObject = smgr->createItem(asV2mesh("athene.mesh", RG_MYRG));
 	auto objectNode = smgr->getRootSceneNode()->createChildSceneNode();
 	objectNode->attachObject(a3dObject);
-	objectNode->setScale(0.1, 0.1, 0.1);
+	objectNode->setScale(0.1f, 0.1f, 0.1f);
+	objectNode->setPosition(5, 0, 0);
+
+	auto Sinbad = smgr->createItem(asV2mesh("Sinbad.mesh", RG_MYRG));
+	auto SinbadNode = smgr->getRootSceneNode()->createChildSceneNode();
+	SinbadNode->attachObject(Sinbad);
+	SinbadNode->setScale(1.3f, 1.3f, 1.3f);
+	SinbadNode->setPosition(-5, 0, 0);
 
 	//Move the camera
-	camera->setPosition({ 0, 10, 20 });
-	camera->lookAt(objectNode->getPosition());
-	camera->setNearClipDistance(0.001);
-	camera->setFarClipDistance(2000);
-	camera->setAutoAspectRatio(true);
+	cameraNode->setPosition({ 0, 5, 20 });
+	cameraNode->lookAt({ 0, 0, 0 }, Ogre::Node::TransformSpace::TS_PARENT);
 
+	Ogre::ColourValue warm{ 1, 0.75f, 0.75f }, cold{ 0.75f, 0.75f, 1 };
+
+	//Add a light
 	auto light = smgr->createLight();
 	auto lightNode = smgr->getRootSceneNode()->createChildSceneNode();
 	lightNode->attachObject(light);
 	light->setType(Ogre::Light::LT_DIRECTIONAL);
-	light->setDirection(Ogre::Vector3(0, -1, -0.75f).normalisedCopy());
+	light->setDirection(Ogre::Vector3(-1, -1, -0.75f).normalisedCopy());
 	light->setPowerScale(Ogre::Math::PI);
+	light->setDiffuseColour(warm);
+	light->setSpecularColour(warm);
+
+	//Add a light
+	light = smgr->createLight();
+	lightNode = smgr->getRootSceneNode()->createChildSceneNode();
+	lightNode->attachObject(light);
+	light->setType(Ogre::Light::LT_DIRECTIONAL);
+	light->setDirection(Ogre::Vector3(1, 1, -0.75f).normalisedCopy());
+	light->setPowerScale(Ogre::Math::PI);
+	light->setDiffuseColour(cold);
+	light->setSpecularColour(cold);
+
+	//Add a light
+	auto pointlight = smgr->createLight();
+	auto pointlightNode = smgr->getRootSceneNode()->createChildSceneNode();
+	pointlightNode->attachObject(pointlight);
+	pointlight->setType(Ogre::Light::LT_POINT);
+	pointlightNode->setPosition(0, 3, 0);
+	/*pointlight->setPowerScale(100 * Ogre::Math::PI);
+	pointlight->setDiffuseColour(Ogre::ColourValue::Blue);
+	pointlight->setSpecularColour(Ogre::ColourValue::Blue);*/
+
+	Ogre::Quaternion orientation;
 
 	root->getTimer()->reset();
 	do
 	{
-		objectNode->setOrientation(animation(static_cast<float>(root->getTimer()->getMilliseconds()) / 1000.0f));
+		orientation = animation(static_cast<float>(root->getTimer()->getMilliseconds()) / 1000.0f);
+		objectNode->setOrientation(orientation);
+		SinbadNode->setOrientation(orientation);
+
 		Ogre::WindowEventUtilities::messagePump();
 		if (window->isClosed()) break;
 		root->renderOneFrame();
