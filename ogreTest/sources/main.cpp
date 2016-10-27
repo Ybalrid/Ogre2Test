@@ -16,6 +16,7 @@
 #include <Compositor/OgreCompositorManager2.h>
 #include <Compositor/OgreCompositorWorkspace.h>
 
+//Mandatory for starting the program as a Win32 application
 #include <Windows.h>
 
 //Change the number of threads Ogre should use here
@@ -30,8 +31,16 @@ constexpr const char* const RG_MYRG{ "MY_RESOURCE_GROUP" };
 constexpr const char* const SL{ "GLSL" };
 constexpr const char* const GL3PLUS_RENDERSYSTEM{ "OpenGL 3+ Rendering Subsystem" };
 
-//Level of anti-aliasing
-Ogre::uint8 AALevel{ 16 };
+//RenderWindow configuration
+Ogre::uint8 WindowAALevel{ 16 };
+Ogre::Vector2 WindowPosition{ 0,0 }, WindowSize(1024, 768);
+bool WindowVsync{ false }, WindowFullscreen{ false };
+
+std::string to_string(bool b)
+{
+	if (b) return "true";
+	return "false";
+}
 
 using namespace std;
 
@@ -81,7 +90,9 @@ void declareHlmsLibrary(const Ogre::String&& path)
 	if (hlmsFolder.empty()) hlmsFolder = "./";
 	else if (hlmsFolder[hlmsFolder.size() - 1] != '/') hlmsFolder += "/";
 
+	//Get the hlmsManager (not a singleton by itself, but accessible via Root)
 	auto hlmsManager = Ogre::Root::getSingleton().getHlmsManager();
+
 	//Define the shader library to use for HLMS
 	auto library = Ogre::ArchiveVec();
 	auto archiveLibrary = Ogre::ArchiveManager::getSingletonPtr()->load(hlmsFolder + "Hlms/Common/" + SL, "FileSystem", true);
@@ -121,8 +132,9 @@ int main(void)
 	if (!renderSystem) throw std::runtime_error("Ogre is unable to find the GL3+ RenderSystem");
 #endif
 
+	//Configure Ogre Root to render
 	root->setRenderSystem(renderSystem);
-	renderSystem->setConfigOption("FSAA", to_string(AALevel));
+	renderSystem->setConfigOption("FSAA", to_string(WindowAALevel));
 	renderSystem->setConfigOption("sRGB Gamma Conversion", "Yes");
 
 	//Init Ogre without automatically creating the render window
@@ -130,17 +142,18 @@ int main(void)
 
 	//Put the miscellaneous configuration option the window can take in a value pair list
 	auto misc = Ogre::NameValuePairList();
-	misc["vsync"] = "false";
-	misc["FSAA"] = to_string(AALevel);
-	misc["top"] = to_string(0);
-	misc["left"] = to_string(0);
+	misc["vsync"] = to_string(WindowVsync);
+	misc["FSAA"] = to_string(WindowAALevel);
+	misc["top"] = to_string(WindowPosition.x);
+	misc["left"] = to_string(WindowPosition.y);
 
 	//Manually create a window
-	auto window = root->createRenderWindow("Ogre Window", 1024, 768, false, &misc);
+	auto window = root->createRenderWindow("Ogre Window", WindowSize.x, WindowSize.y, WindowFullscreen, &misc);
 
 	//Create a scene manager that use X threads
 	auto smgr = root->createSceneManager(Ogre::ST_GENERIC, SMGR_WORKERS, Ogre::INSTANCING_CULLING_THREADED);
 	smgr->setDisplaySceneNodes(true);
+	smgr->setForward3D(true, 4, 4, 5, 96, 0.1f, 200);
 
 	//Declare some resources
 	auto resourceGroupManager = Ogre::ResourceGroupManager::getSingletonPtr();
@@ -159,6 +172,7 @@ int main(void)
 	camera->setFarClipDistance(2000);
 	camera->setAutoAspectRatio(true);
 
+	//Create a camera, detach it from the root node and attach it to a new node
 	if (auto cameraNode = camera->getParentSceneNode()) cameraNode->detachObject(camera);
 	auto cameraNode = smgr->getRootSceneNode()->createChildSceneNode();
 	cameraNode->attachObject(camera);
@@ -181,6 +195,7 @@ int main(void)
 	objectNode->setScale(0.1f, 0.1f, 0.1f);
 	objectNode->setPosition(5, 0, 0);
 
+	//Create a Sinbad Item from the good old Sinbad mesh (with modified texture to use hlmsPbs)
 	auto Sinbad = smgr->createItem(asV2mesh("Sinbad.mesh", RG_MYRG));
 	auto SinbadNode = smgr->getRootSceneNode()->createChildSceneNode();
 	SinbadNode->attachObject(Sinbad);
@@ -191,6 +206,7 @@ int main(void)
 	cameraNode->setPosition({ 0, 5, 20 });
 	cameraNode->lookAt({ 0, 0, 0 }, Ogre::Node::TransformSpace::TS_PARENT);
 
+	//define colors for the light
 	Ogre::ColourValue warm{ 1, 0.75f, 0.75f }, cold{ 0.75f, 0.75f, 1 };
 
 	//Add a light
@@ -215,17 +231,17 @@ int main(void)
 
 	//Add a light
 	auto pointlight = smgr->createLight();
-	auto pointlightNode = smgr->getRootSceneNode()->createChildSceneNode();
+	auto pointlightNode = smgr->getRootSceneNode()->createChildSceneNode(Ogre::SCENE_DYNAMIC);
 	pointlightNode->attachObject(pointlight);
 	pointlight->setType(Ogre::Light::LT_POINT);
-	pointlightNode->setPosition(0, 3, 0);
-	/*pointlight->setPowerScale(100 * Ogre::Math::PI);
-	pointlight->setDiffuseColour(Ogre::ColourValue::Blue);
-	pointlight->setSpecularColour(Ogre::ColourValue::Blue);*/
+	pointlightNode->setPosition(0, 3, 2);
+	pointlight->setPowerScale(10 * Ogre::Math::PI);
+	pointlight->setDiffuseColour(warm);
+	pointlight->setSpecularColour(cold);
+	pointlight->setCastShadows(true);
 
 	Ogre::Quaternion orientation;
 
-	root->getTimer()->reset();
 	do
 	{
 		orientation = animation(static_cast<float>(root->getTimer()->getMilliseconds()) / 1000.0f);
