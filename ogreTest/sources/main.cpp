@@ -202,6 +202,25 @@ int main(void)
 	SinbadNode->setScale(1.3f, 1.3f, 1.3f);
 	SinbadNode->setPosition(-5, 0, 0);
 
+	Ogre::SkeletonAnimation* danceAnim{ nullptr };
+#ifdef _DEBUG
+	if (Sinbad->hasSkeleton())
+	{
+		cerr << "skeleton!\n";
+		cerr << "Sinbad animations : " << Sinbad->getSkeletonInstance()->getAnimations().size() << '\n';
+#endif
+		danceAnim = Sinbad->getSkeletonInstance()->getAnimation("Dance");
+#ifdef _DEBUG
+	}
+
+	if (danceAnim)
+	{
+#endif
+		danceAnim->setEnabled(true);
+		danceAnim->setLoop(true);
+#ifdef _DEBUG
+	}
+#endif
 	//Move the camera
 	cameraNode->setPosition({ 0, 5, 20 });
 	cameraNode->lookAt({ 0, 0, 0 }, Ogre::Node::TransformSpace::TS_PARENT);
@@ -242,11 +261,15 @@ int main(void)
 
 	Ogre::Quaternion orientation;
 
+	Ogre::Real then, now{ 0 };
 	do
 	{
-		orientation = animation(static_cast<float>(root->getTimer()->getMilliseconds()) / 1000.0f);
+		then = now;
+		orientation = animation(now = (static_cast<float>(root->getTimer()->getMilliseconds()) / 1000.0f));
 		objectNode->setOrientation(orientation);
 		SinbadNode->setOrientation(orientation);
+
+		if (danceAnim) danceAnim->addTime(now - then);
 
 		Ogre::WindowEventUtilities::messagePump();
 		if (window->isClosed()) break;
