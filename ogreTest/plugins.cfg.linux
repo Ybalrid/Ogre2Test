@@ -1,0 +1,3 @@
+PluginFolder = /home/ybalrid/femtogram/ogre/build/sdk/lib/OGRE
+
+Plugin=RenderSystem_GL3Plus

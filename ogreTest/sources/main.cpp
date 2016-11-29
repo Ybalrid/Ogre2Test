@@ -10,6 +10,7 @@
 #include <OgreHlms.h>
 #include <OgreHlmsCommon.h>
 #include <OgreHlmsManager.h>
+#include <OgreSceneNode.h>
 #include <OgreLight.h>
 #include <Hlms/Pbs/OgreHlmsPbs.h>
 #include <Hlms/Unlit/OgreHlmsUnlit.h>
@@ -17,7 +18,9 @@
 #include <Compositor/OgreCompositorWorkspace.h>
 
 //Mandatory for starting the program as a Win32 application
+#ifdef _WIN32
 #include <Windows.h>
+#endif
 
 //Change the number of threads Ogre should use here
 constexpr const size_t SMGR_WORKERS{ 4 };
@@ -44,7 +47,7 @@ std::string to_string(bool b)
 
 using namespace std;
 
-void pause()
+void pauseConsole()
 {
 	cout << "Press RETURN to continue" << endl;
 	cin.get();
@@ -107,12 +110,13 @@ void declareHlmsLibrary(const Ogre::String&& path)
 	hlmsManager->registerHlms(hlmsPbs);
 }
 
+#ifdef _WIN32
 int main(void);
-
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
 {
 	return main();
 }
+#endif
 
 int main(void)
 {
@@ -173,9 +177,10 @@ int main(void)
 	camera->setAutoAspectRatio(true);
 
 	//Create a camera, detach it from the root node and attach it to a new node
-	if (auto cameraNode = camera->getParentSceneNode()) cameraNode->detachObject(camera);
-	auto cameraNode = smgr->getRootSceneNode()->createChildSceneNode();
+/*	if (Ogre::SceneNode* cameraNode = camera->getParentSceneNode()) cameraNode->detachObject(camera);
+    Ogre::SceneNode* cameraNode = smgr->getRootSceneNode()->createChildSceneNode();
 	cameraNode->attachObject(camera);
+    */
 
 	//Configure the compositor for simple rendering
 	auto compositorManager = root->getCompositorManager2();
@@ -222,8 +227,12 @@ int main(void)
 	}
 #endif
 	//Move the camera
-	cameraNode->setPosition({ 0, 5, 20 });
+	/*cameraNode->setPosition({ 0, 5, 20 });
 	cameraNode->lookAt({ 0, 0, 0 }, Ogre::Node::TransformSpace::TS_PARENT);
+*/
+
+    camera->setPosition(0,5,20);
+    camera->lookAt(0,0,0);
 
 	//define colors for the light
 	Ogre::ColourValue warm{ 1, 0.75f, 0.75f }, cold{ 0.75f, 0.75f, 1 };
