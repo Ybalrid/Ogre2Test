@@ -186,9 +186,10 @@ int main(void)
 	auto compositorManager = root->getCompositorManager2();
 
 	//Create a compositor workspace, and register it to the manager
-	const Ogre::IdString workspaceName{ "MyWorkspace" };
+    const Ogre::String workspaceNameStr{ "MyWorkspace" };
+	const Ogre::IdString workspaceName{ workspaceNameStr };
 	if (!compositorManager->hasWorkspaceDefinition(workspaceName))
-		compositorManager->createBasicWorkspaceDef(workspaceName, Ogre::ColourValue{ 0.2f, 0.3f, 0.4f });
+		compositorManager->createBasicWorkspaceDef(workspaceNameStr, Ogre::ColourValue{ 0.2f, 0.3f, 0.4f });
 
 	//Give it the current scene, the camera from where to render, and use the window as output
 	auto workspace = compositorManager->addWorkspace(smgr, window, camera, workspaceName, true);
