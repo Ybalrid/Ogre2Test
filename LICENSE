@@ -1,8 +1,3 @@
-The following licence only apply to the `main.cpp` file, the makefile and any 
-other file used to actually compile this simple program, and does **NOT** include the 
-HLMS library and other graphcis resources used here. They are part of the freely 
-redistribuable OGRE SDK, and are vendored in this repository for convinience only.
-
 This is free and unencumbered software released into the public domain.
 
 Anyone is free to copy, modify, publish, use, compile, sell, or
