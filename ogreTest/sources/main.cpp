@@ -87,27 +87,32 @@ void declareHlmsLibrary(const Ogre::String&& path)
 	if (string(SL) != "GLSL" || string(Ogre::Root::getSingleton().getRenderSystem()->getName()) != "OpenGL 3+ Rendering Subsystem")
 		throw std::runtime_error("This function is OpenGL only. Please use the RenderSytem_GL3+ in the Ogre configuration!");
 #endif
-	Ogre::String hlmsFolder = path;
+    Ogre::String hlmsFolder = path;
 
-	//The hlmsFolder can come from a configuration file where it could be "empty" or set to "." or lacking the trailing "/"
-	if (hlmsFolder.empty()) hlmsFolder = "./";
-	else if (hlmsFolder[hlmsFolder.size() - 1] != '/') hlmsFolder += "/";
+    //The hlmsFolder can come from a configuration file where it could be "empty" or set to "." or lacking the trailing "/"
+    if (hlmsFolder.empty()) hlmsFolder = "./";
+    else if (hlmsFolder[hlmsFolder.size() - 1] != '/') hlmsFolder += "/";
 
-	//Get the hlmsManager (not a singleton by itself, but accessible via Root)
-	auto hlmsManager = Ogre::Root::getSingleton().getHlmsManager();
+    //Get the hlmsManager (not a singleton by itself, but accessible via Root)
+    auto hlmsManager = Ogre::Root::getSingleton().getHlmsManager();
 
-	//Define the shader library to use for HLMS
-	auto library = Ogre::ArchiveVec();
-	auto archiveLibrary = Ogre::ArchiveManager::getSingletonPtr()->load(hlmsFolder + "Hlms/Common/" + SL, "FileSystem", true);
-	library.push_back(archiveLibrary);
+    //Define the shader library to use for HLMS
+    auto library = Ogre::ArchiveVec();
 
-	//Define "unlit" and "PBS" (physics based shader) HLMS
-	auto archiveUnlit = Ogre::ArchiveManager::getSingletonPtr()->load(hlmsFolder + "Hlms/Unlit/" + SL, "FileSystem", true);
-	auto archivePbs = Ogre::ArchiveManager::getSingletonPtr()->load(hlmsFolder + "Hlms/Pbs/" + SL, "FileSystem", true);
-	auto hlmsUnlit = OGRE_NEW Ogre::HlmsUnlit(archiveUnlit, &library);
-	auto hlmsPbs = OGRE_NEW Ogre::HlmsPbs(archivePbs, &library);
-	hlmsManager->registerHlms(hlmsUnlit);
-	hlmsManager->registerHlms(hlmsPbs);
+    auto archiveLibrary = Ogre::ArchiveManager::getSingletonPtr()->load(hlmsFolder + "Hlms/Common/" + SL, "FileSystem", true);
+    auto archiveLibraryAny = Ogre::ArchiveManager::getSingletonPtr()->load(hlmsFolder + "Hlms/Common/Any", "FileSystem", true);
+    auto archivePbsLibraryAny = Ogre::ArchiveManager::getSingletonPtr()->load(hlmsFolder + "Hlms/Pbs/Any", "FileSystem", true);
+    library.push_back(archiveLibrary);
+    library.push_back(archiveLibraryAny);
+    library.push_back(archivePbsLibraryAny);
+
+    //Define "unlit" and "PBS" (physics based shader) HLMS
+    auto archiveUnlit = Ogre::ArchiveManager::getSingletonPtr()->load(hlmsFolder + "Hlms/Unlit/" + SL, "FileSystem", true);
+    auto archivePbs = Ogre::ArchiveManager::getSingletonPtr()->load(hlmsFolder + "Hlms/Pbs/" + SL, "FileSystem", true);
+    auto hlmsUnlit = OGRE_NEW Ogre::HlmsUnlit(archiveUnlit, &library);
+    auto hlmsPbs = OGRE_NEW Ogre::HlmsPbs(archivePbs, &library);
+    hlmsManager->registerHlms(hlmsUnlit);
+    hlmsManager->registerHlms(hlmsPbs);
 }
 
 #ifdef _WIN32
