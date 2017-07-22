@@ -172,7 +172,7 @@ int main(void)
 	//Create a scene manager that use X threads
 	auto smgr = root->createSceneManager(Ogre::ST_GENERIC, SMGR_WORKERS, Ogre::INSTANCING_CULLING_THREADED);
 	//smgr->setDisplaySceneNodes(true);
-	//smgr->setForward3D(true, 4, 4, 5, 96, 0.1f, 200);
+	smgr->setForward3D(true, 4, 4, 5, 96, 0.1f, 200);
 
 	//Declare some resources
 	auto resourceGroupManager = Ogre::ResourceGroupManager::getSingletonPtr();
