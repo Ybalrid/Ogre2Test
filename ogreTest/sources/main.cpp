@@ -81,39 +81,47 @@ decltype(auto) asV2mesh(Ogre::String meshName, Ogre::String ResourceGroup = Ogre
 	return mesh;
 }
 
-void declareHlmsLibrary(const Ogre::String&& path)
+void declareHlmsLibrary(Ogre::String&& path)
 {
 #ifdef _DEBUG
 	if (string(ShaderLanguage) != "GLSL" || string(Ogre::Root::getSingleton().getRenderSystem()->getName()) != "OpenGL 3+ Rendering Subsystem")
 		throw std::runtime_error("This function is OpenGL only. Please use the RenderSytem_GL3+ in the Ogre configuration!");
 #endif
-	Ogre::String hlmsFolder = path;
+	//Ogre::String path = path;
+	auto log = [](const std::string& message) {Ogre::LogManager::getSingleton().logMessage(message); };
 
 	//The hlmsFolder can come from a configuration file where it could be "empty" or set to "." or lacking the trailing "/"
-	if (hlmsFolder.empty()) hlmsFolder = "./";
-	else if (hlmsFolder[hlmsFolder.size() - 1] != '/') hlmsFolder += "/";
+	if (path.empty()) path = "./";
+	else if (path[path.size() - 1] != '/') path += "/";
+
+	log("The data folder path for the hlms library is : " + path);
+	log("The shader language used for the hlms library is : " + string{ ShaderLanguage });
 
 	//Get the hlmsManager (not a singleton by itself, but accessible via Root)
 	auto hlmsManager = Ogre::Root::getSingleton().getHlmsManager();
 
 	//Define the shader library to use for HLMS
-	auto library = Ogre::ArchiveVec();
+	auto commonLibrary = Ogre::ArchiveVec();
 
-	auto archiveLibrary = Ogre::ArchiveManager::getSingletonPtr()->load(hlmsFolder + "Hlms/Common/" + ShaderLanguage, "FileSystem", true);
-	auto archiveLibraryAny = Ogre::ArchiveManager::getSingletonPtr()->load(hlmsFolder + "Hlms/Common/Any", "FileSystem", true);
-	auto archivePbsLibraryAny = Ogre::ArchiveManager::getSingletonPtr()->load(hlmsFolder + "Hlms/Pbs/Any", "FileSystem", true);
-	auto archiveUnlitLibraryAny = Ogre::ArchiveManager::getSingletonPtr()->load(hlmsFolder + "Hlms/Unlit/Any", "FileSystem", true);
-	library.push_back(archiveLibrary);
-	library.push_back(archiveLibraryAny);
-	library.push_back(archivePbsLibraryAny);
-	library.push_back(archiveUnlitLibraryAny);
+	auto archiveCommonLibrary = Ogre::ArchiveManager::getSingletonPtr()->load(path + "Hlms/Common/" + ShaderLanguage, "FileSystem", true);
+	auto archiveCommonLibraryAny = Ogre::ArchiveManager::getSingletonPtr()->load(path + "Hlms/Common/Any", "FileSystem", true);
+	commonLibrary.push_back(archiveCommonLibrary);
+	commonLibrary.push_back(archiveCommonLibraryAny);
 
 	//Define "unlit" and "PBS" (physics based shader) HLMS
-	auto archiveUnlit = Ogre::ArchiveManager::getSingletonPtr()->load(hlmsFolder + "Hlms/Unlit/" + ShaderLanguage, "FileSystem", true);
-	auto archivePbs = Ogre::ArchiveManager::getSingletonPtr()->load(hlmsFolder + "Hlms/Pbs/" + ShaderLanguage, "FileSystem", true);
-	auto hlmsUnlit = OGRE_NEW Ogre::HlmsUnlit(archiveUnlit, &library);
-	auto hlmsPbs = OGRE_NEW Ogre::HlmsPbs(archivePbs, &library);
+	auto archiveUnlitLibraryAny = Ogre::ArchiveManager::getSingletonPtr()->load(path + "Hlms/Unlit/Any", "FileSystem", true);
+	commonLibrary.push_back(archiveUnlitLibraryAny); //Add the unlit
+	auto archiveUnlit = Ogre::ArchiveManager::getSingletonPtr()->load(path + "Hlms/Unlit/" + ShaderLanguage, "FileSystem", true);
+	auto hlmsUnlit = OGRE_NEW Ogre::HlmsUnlit(archiveUnlit, &commonLibrary);
 	hlmsManager->registerHlms(hlmsUnlit);
+
+	//Remove the last one loaded...
+	commonLibrary.pop_back(); //pop the unlit
+
+	auto archivePbsLibraryAny = Ogre::ArchiveManager::getSingletonPtr()->load(path + "Hlms/Pbs/Any", "FileSystem", true);
+	commonLibrary.push_back(archivePbsLibraryAny); //push the unlit
+	auto archivePbs = Ogre::ArchiveManager::getSingletonPtr()->load(path + "Hlms/Pbs/" + ShaderLanguage, "FileSystem", true);
+	auto hlmsPbs = OGRE_NEW Ogre::HlmsPbs(archivePbs, &commonLibrary);
 	hlmsManager->registerHlms(hlmsPbs);
 }
 
