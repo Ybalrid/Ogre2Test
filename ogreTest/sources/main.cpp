@@ -140,9 +140,14 @@ int main(void)
 	//auto quitThread = thread(quitOnPose);quitThread.detach();
 
 	//Create root
-	auto root = make_unique<Ogre::Root>("plugins.cfg", "ogre.cfg", "Ogre.log");
+	auto root = make_unique<Ogre::Root>("", "ogre.cfg", "Ogre.log");
 	Ogre::LogManager::getSingleton().setLogDetail(Ogre::LoggingLevel::LL_BOREME);
 
+#ifndef _DEBUG
+	root->loadPlugin("RenderSystem_GL3Plus");
+#else
+	root->loadPlugin("RenderSystem_GL3Plus_d");
+#endif
 	//Get the OpenGL 3+ RenderSystem
 	auto renderSystem = root->getRenderSystemByName(GL3PLUS_RENDERSYSTEM);
 
